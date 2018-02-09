@@ -95,6 +95,15 @@ client.onmessage = function(e) {
 };
 
 function chatApp(client) {
+  client.send(
+    JSON.stringify({
+      msg: 'sendMessage',
+      data: {
+        username: 'system',
+        message: `${chalk.bold(prefs.username)} just joined...`,
+      },
+    })
+  );
   vorpal
     .command('/clear')
     .description('Clears the chat log for everyone')
@@ -105,6 +114,13 @@ function chatApp(client) {
         })
       );
       clear();
+      cb();
+    });
+  vorpal
+    .command('/logout')
+    .description('Erases your username')
+    .action(function(args, cb) {
+      prefs.username = '';
       cb();
     });
 
