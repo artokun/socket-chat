@@ -1,6 +1,7 @@
 const W3CWebSocket = require('websocket').w3cwebsocket;
 const vorpal = require('vorpal')();
 const inquirer = require('inquirer');
+const figlet = require('figlet');
 const chalk = require('chalk');
 const CLI = require('clui');
 const notifier = require('node-notifier');
@@ -67,6 +68,18 @@ client.onmessage = function(e) {
           break;
         case 'initMessages':
           messages = message.data;
+          setTimeout(function() {
+            client.send(
+              JSON.stringify({
+                msg: 'sendMessage',
+                data: {
+                  username: 'system',
+                  message: `${chalk.bold(prefs.username)} just joined...`,
+                },
+              })
+            );
+            appendMessage();
+          }, 3000);
           break;
         case 'sendMessage':
           messages.push(message.data);
@@ -76,17 +89,8 @@ client.onmessage = function(e) {
               message: message.data.message,
             });
           }
+          appendMessage();
           break;
-      }
-
-      if (messages.length) {
-        let chatLog = messages.map(
-          log =>
-            chalk.rgb(...log.username.hashColor())(`${log.username}: `) +
-            `${log.message}`
-        );
-        clear();
-        vorpal.log(chatLog.join('\n'));
       }
     } catch (e) {
       vorpal.log('Client Error: ', e);
@@ -95,15 +99,19 @@ client.onmessage = function(e) {
 };
 
 function chatApp(client) {
-  client.send(
-    JSON.stringify({
-      msg: 'sendMessage',
-      data: {
-        username: 'system',
-        message: `${chalk.bold(prefs.username)} just joined...`,
-      },
-    })
+  // Show banner
+  clear();
+  vorpal.log(
+    chalk.yellow(
+      figlet.textSync('CLI - Chat', {
+        font: 'Slant',
+      })
+    )
   );
+  vorpal.log(chalk.bold.green('\n  Super unsecure and anonymous'));
+  vorpal.log(chalk.cyan(`  Version: 0.0.1 \n`));
+  // End banner
+
   vorpal
     .command('/clear')
     .description('Clears the chat log for everyone')
@@ -159,4 +167,16 @@ function chatApp(client) {
 
   // show
   vorpal.delimiter(`$cli-chat${':' + prefs.username || ''}>`).show();
+}
+
+function appendMessage() {
+  if (messages.length) {
+    let chatLog = messages.map(
+      log =>
+        chalk.rgb(...log.username.hashColor())(`${log.username}: `) +
+        `${log.message}`
+    );
+    clear();
+    vorpal.log(chatLog.join('\n'));
+  }
 }
