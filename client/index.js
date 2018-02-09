@@ -43,6 +43,7 @@ client.onmessage = function(e) {
       switch (message.msg) {
         case 'clear':
           messages = [];
+          break;
         case 'initMessages':
           messages = message.data;
           break;
@@ -65,6 +66,19 @@ client.onmessage = function(e) {
 };
 
 function chatApp(client) {
+  vorpal
+    .command('/clear')
+    .description('Clears the chat log for everyone')
+    .action(function(args, cb) {
+      client.send(
+        JSON.stringify({
+          msg: 'clear',
+        })
+      );
+      clear();
+      cb();
+    });
+
   vorpal.catch('[words...]', 'Chat').action(function(args, cb) {
     if (!prefs.username) {
       return inquirer
