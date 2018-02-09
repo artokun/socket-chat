@@ -9,8 +9,11 @@ var server = http.createServer(function(request, response) {
   response.end();
 });
 
-let connections = [];
 let messages = [];
+
+const clients = new Map();
+const subscriptions = new Map();
+subscriptions.set('general', new Set());
 
 server.listen(PORT, function() {
   console.log(new Date() + ' Server is listening on port', PORT);
@@ -37,16 +40,16 @@ wsServer.on('request', function(request) {
     return;
   }
   // Accept connection
-  const connection = request.accept('chat-app', request.origin);
+  const client = request.accept('chat-app', request.origin);
 
-  // Collect connection
-  connections.push(connection);
-  console.log(
-    new Date() + ' Connection accepted from ' + connection.remoteAddress
-  );
+  // Collect clients and assign to general chat
+  clients.set(client.id, client);
+  subscriptions.get('general').add(client.id);
+
+  console.log(new Date() + ' Connection accepted from ' + client.remoteAddress);
 
   // Send initial messages to the user
-  connection.sendUTF(
+  client.sendUTF(
     JSON.stringify({
       msg: 'initMessages',
       // data: messages.slice(Math.max(messages.length - 15, 1)), // return last 15 messages
@@ -54,20 +57,18 @@ wsServer.on('request', function(request) {
     })
   );
 
-  // Handle closed connections
-  connection.on('close', function(reasonCode, description) {
-    var index = connections.indexOf(connection);
-    if (index !== -1) {
-      // remove the connection from the pool
-      connections.splice(index, 1);
-    }
+  // Handle closed clients
+  client.on('close', function(reasonCode, description) {
+    // Unsubscribe client from general and remove from clients list
+    subscriptions.get('general').delete(client.id);
+    clients.delete(client.id);
     console.log(
-      new Date() + ' Peer ' + connection.remoteAddress + ' disconnected.'
+      new Date() + ' Peer ' + client.remoteAddress + ' disconnected.'
     );
   });
 
   // Handle incoming messages
-  connection.on('message', function(message) {
+  client.on('message', function(message) {
     // Check message type
     if (message.type !== 'utf8') {
       return console.log('Invalid Message Type: ', type);
@@ -85,8 +86,8 @@ wsServer.on('request', function(request) {
       }
 
       // broadcast message to all clients
-      connections.forEach(connection => {
-        connection.sendUTF(message.utf8Data);
+      subscriptions.get('general').forEach(clientId => {
+        clients.get(clientId).sendUTF(message.utf8Data);
       });
     } catch (e) {
       console.log('Server error: ', e);
