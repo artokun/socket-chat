@@ -13,6 +13,27 @@ let prefs = new Preferences('com.ws-chat-app', {
 let instance;
 let messages = [];
 
+/* START colored hashes for names */
+String.prototype.hashColor = function() {
+  var hash = 0,
+    i,
+    chr;
+  if (this.length === 0) return hash;
+  for (i = 0; i < this.length; i++) {
+    chr = this.charCodeAt(i);
+    hash = (hash << 5) - hash + chr;
+    hash |= 0; // Convert to 32bit integer
+  }
+
+  const r = (hash & 0xff0000) >> 16;
+  const g = (hash & 0x00ff00) >> 8;
+  const b = hash & 0x0000ff;
+
+  return [r, g, b];
+};
+
+/* END colored hashes for names */
+
 let client = new W3CWebSocket(
   'wss://socket-chat-nipcjrifnw.now.sh',
   'chat-app'
@@ -49,12 +70,20 @@ client.onmessage = function(e) {
           break;
         case 'sendMessage':
           messages.push(message.data);
+          if (message.data.username !== prefs.username) {
+            notifier.notify({
+              title: message.data.username + ' said...',
+              message: message.data.message,
+            });
+          }
           break;
       }
 
       if (messages.length) {
         let chatLog = messages.map(
-          log => chalk.yellow(`${log.username}: `) + `${log.message}`
+          log =>
+            chalk.rgb(...log.username.hashColor())(`${log.username}: `) +
+            `${log.message}`
         );
         clear();
         vorpal.log(chatLog.join('\n'));
