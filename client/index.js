@@ -12,8 +12,8 @@ var prefs = new Preferences('com.ws-chat-app', {
 });
 let instance;
 
-// var client = new W3CWebSocket('wss://socket-chat-bxpqmnuowa.now.sh');
-var client = new W3CWebSocket('ws://localhost:8080');
+var client = new W3CWebSocket('wss://socket-chat-ebobcyxwkj.now.sh');
+// var client = new W3CWebSocket('ws://localhost:8080');
 
 client.onerror = function() {
   console.log('Connection Error');
