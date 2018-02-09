@@ -1,27 +1,23 @@
 #!/usr/bin/env node
-var WebSocketServer = require('websocket').server;
-var http = require('http');
-
-const database = {
-  messages: [],
-};
+const WebSocketServer = require('websocket').server;
+const http = require('http');
+const PORT = process.env.PORT || 8080;
 
 var server = http.createServer(function(request, response) {
   console.log(new Date() + ' Received request for ' + request.url);
   response.writeHead(404);
   response.end();
 });
-server.listen(process.env.PORT || 8080, function() {
-  console.log(new Date() + ' Server is listening on port 8080');
+
+let connections = [];
+let messages = [];
+
+server.listen(PORT, function() {
+  console.log(new Date() + ' Server is listening on port', PORT);
 });
 
 wsServer = new WebSocketServer({
   httpServer: server,
-  // You should not use autoAcceptConnections for production
-  // applications, as it defeats all standard cross-origin protection
-  // facilities built into the protocol and the browser.  You should
-  // *always* verify the connection's origin and decide whether or not
-  // to accept it.
   autoAcceptConnections: false,
 });
 
@@ -31,6 +27,7 @@ function originIsAllowed(origin) {
 }
 
 wsServer.on('request', function(request) {
+  // Approve or Deny connection request
   if (!originIsAllowed(request.origin)) {
     // Make sure we only accept requests from an allowed origin
     request.reject();
@@ -39,25 +36,60 @@ wsServer.on('request', function(request) {
     );
     return;
   }
+  // Accept connection
+  const connection = request.accept('chat-app', request.origin);
 
-  var connection = request.accept();
-  console.log(new Date() + ' Connection accepted.');
-  connection.on('message', function(message) {
-    if (message.type === 'utf8') {
-      console.log('Received Message: ' + message.utf8Data);
-      const obj = JSON.parse(message.utf8Data);
-      database.messages.push(obj);
-      connection.sendUTF(JSON.stringify(database.messages));
-    } else if (message.type === 'binary') {
-      console.log(
-        'Received Binary Message of ' + message.binaryData.length + ' bytes'
-      );
-      connection.sendBytes(message.binaryData);
-    }
-  });
+  // Collect connection
+  connections.push(connection);
+  console.log(
+    new Date() + ' Connection accepted from ' + connection.remoteAddress
+  );
+
+  // Send initial messages to the user
+  connection.sendUTF(
+    JSON.stringify({
+      msg: 'initMessages',
+      // data: messages.slice(Math.max(messages.length - 15, 1)), // return last 15 messages
+      data: messages,
+    })
+  );
+
+  // Handle closed connections
   connection.on('close', function(reasonCode, description) {
+    var index = connections.indexOf(connection);
+    if (index !== -1) {
+      // remove the connection from the pool
+      connections.splice(index, 1);
+    }
     console.log(
       new Date() + ' Peer ' + connection.remoteAddress + ' disconnected.'
     );
+  });
+
+  // Handle incoming messages
+  connection.on('message', function(message) {
+    // Check message type
+    if (message.type !== 'utf8') {
+      return console.log('Invalid Message Type: ', type);
+    }
+    try {
+      let parsedMessage = JSON.parse(message.utf8Data);
+
+      switch (parsedMessage.msg) {
+        case 'clear':
+          messages = [];
+          break;
+        case 'sendMessage':
+          messages.push(parsedMessage.data);
+          break;
+      }
+
+      // broadcast message to all clients
+      connections.forEach(connection => {
+        connection.sendUTF(message.utf8Data);
+      });
+    } catch (e) {
+      console.log('Server error: ', e);
+    }
   });
 });

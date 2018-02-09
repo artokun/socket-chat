@@ -7,45 +7,65 @@ const notifier = require('node-notifier');
 const Preferences = require('preferences');
 
 const clear = CLI.Clear;
-var prefs = new Preferences('com.ws-chat-app', {
+let prefs = new Preferences('com.ws-chat-app', {
   username: '',
 });
 let instance;
+let messages = [];
 
-var client = new W3CWebSocket('wss://socket-chat-ebobcyxwkj.now.sh');
-// var client = new W3CWebSocket('ws://localhost:8080');
+let client = new W3CWebSocket(
+  'wss://socket-chat-nipcjrifnw.now.sh',
+  'chat-app'
+);
+// let client = new W3CWebSocket('ws://localhost:8080', 'chat-app');
 
-client.onerror = function() {
-  console.log('Connection Error');
+client.onerror = function(error) {
+  vorpal.log('Connection Error');
 };
 
 client.onopen = function() {
-  console.log('WebSocket Client Connected');
+  vorpal.log('WebSocket Client Connected');
+  //socket-chat-nipcjrifnw.now.sh
 
-  if (client.readyState === client.OPEN) {
+  https: if (client.readyState === client.OPEN) {
     chatApp(client);
   }
 };
 
 client.onclose = function() {
-  console.log('echo-protocol Client Closed');
-  client = new W3CWebSocket('ws://localhost:8080');
+  vorpal.log('chat-app Client Closed');
 };
 
 client.onmessage = function(e) {
   if (typeof e.data === 'string') {
-    clear();
-    const messages = JSON.parse(e.data);
-    const chat = messages.map(({ username, message }) => {
-      return chalk.yellow(username) + ': ' + message;
-    });
-    instance.log(chat.join('\n'));
+    try {
+      let message = JSON.parse(e.data);
+      switch (message.msg) {
+        case 'clear':
+          messages = [];
+        case 'initMessages':
+          messages = message.data;
+          break;
+        case 'sendMessage':
+          messages.push(message.data);
+          break;
+      }
+
+      if (messages.length) {
+        let chatLog = messages.map(
+          log => chalk.yellow(`${log.username}: `) + `${log.message}`
+        );
+        clear();
+        vorpal.log(chatLog.join('\n'));
+      }
+    } catch (e) {
+      vorpal.log('Client Error: ', e);
+    }
   }
 };
 
 function chatApp(client) {
   vorpal.catch('[words...]', 'Chat').action(function(args, cb) {
-    instance = this;
     if (!prefs.username) {
       return inquirer
         .prompt([
@@ -64,13 +84,16 @@ function chatApp(client) {
     try {
       client.send(
         JSON.stringify({
-          username: prefs.username,
-          message: args.words.join(' '),
+          msg: 'sendMessage',
+          data: {
+            username: prefs.username,
+            message: args.words.join(' '),
+          },
         })
       );
       cb();
     } catch (e) {
-      this.log(chalk.red("don't use |, you'll break me!", e));
+      this.log(chalk.red("  Don't use '|', you'll break me!", e));
       cb();
     }
   });
