@@ -42,6 +42,16 @@ wsServer.on('request', function(request) {
   // Accept connection
   const client = request.accept('chat-app', request.origin);
 
+  /*
+  // needs implementing
+  let client = {
+    id: 1,
+    isAuthenticated: true,
+    protocolVersion: 1,
+    connection: <WebSocket Connection instance>
+  }
+  */
+
   // Collect clients and assign to general chat
   clients.set(client.id, client);
   subscriptions.get('general').add(client.id);
